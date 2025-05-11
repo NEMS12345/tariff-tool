@@ -1,3 +1,4 @@
+
 import streamlit as st
 from supabase import create_client, Client
 
@@ -17,9 +18,40 @@ def load_supabase_client() -> Client:
 supabase = load_supabase_client()
 
 # --------------------------------------
+# HELPER
+# --------------------------------------
+def safe_float(val):
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return 0.0
+
+# --------------------------------------
 # SELECT VILLAGE & FETCH DATA
 # --------------------------------------
-village_name = st.sidebar.selectbox("Select Village", ["Classic Residences Brighton"])
+VILLAGE_NAMES = {
+    "Classic Res": "Classic Residences Brighton",
+}
+
+village_list_response = supabase.table("village_inputs").select("village_name").execute()
+
+village_options = [
+    (VILLAGE_NAMES.get(row["village_name"].strip(), row["village_name"].strip()), row["village_name"].strip())
+    for row in village_list_response.data if row.get("village_name")
+]
+
+if not village_options:
+    st.error("No village options found.")
+    st.stop()
+
+village_display_names = sorted([label for label, _ in village_options])
+selected_display_name = st.sidebar.selectbox("Select Village", village_display_names)
+village_name = next((original for label, original in village_options if label == selected_display_name), None)
+
+if not village_name:
+    st.error("Selected village not found. Please check the data.")
+    st.stop()
+
 response = supabase.table("village_inputs").select("*").eq("village_name", village_name).execute()
 if not response.data:
     st.error(f"No data found for '{village_name}'")
@@ -44,7 +76,6 @@ competitor_data = (
 ).data
 competitor_offer = competitor_data[0] if competitor_data else None
 
-# Retailer selector for competitor mode
 if input_mode == "Competitor Offer" and competitor_offer:
     retailer_map = {
         "agl": ["agl_usage_rate", "agl_daily_charge"],
@@ -77,17 +108,19 @@ if input_mode == "Competitor Offer" and competitor_offer:
 # --------------------------------------
 # PULL VALUES FROM SUPABASE
 # --------------------------------------
-TOTAL_USAGE_GATE = row.get("total_usage_kwh", 0)
-RESI_USAGE_KWH = row.get("child_billed_kwh", 0)
-METERED_COMMON_USAGE_KWH = row.get("total_usage_common", 0)
-NMIS_RES = row.get("nmis_res", 0)
-NMIS_COMMON = row.get("nmis_common", 0)
+TOTAL_USAGE_GATE = safe_float(row.get("total_usage_kwh"))
+RESI_USAGE_KWH = safe_float(row.get("child_billed_kwh"))
+METERED_COMMON_USAGE_KWH = safe_float(row.get("total_usage_common"))
+NMIS_RES = safe_float(row.get("nmis_res"))
+NMIS_COMMON = safe_float(row.get("nmis_common"))
 DAYS_IN_YEAR = 365
-TOTAL_SITE_COST = row.get("total_cost", 0)
-ACTUAL_RESI_REVENUE_CY24 = row.get("total_usage_res", 0) + row.get("total_supply_res", 0)
-ACTUAL_COMMON_REVENUE_CY24 = row.get("total_usage_common", 0) + row.get("total_supply_common", 0)
-PROPOSED_USAGE = row.get("proposed_usage_c_per_kwh", 20.0)
-PROPOSED_DAILY = row.get("proposed_daily_c", 100.0) / 100.0
+TOTAL_SITE_COST = safe_float(row.get("total_cost"))
+
+ACTUAL_RESI_REVENUE_CY24 = safe_float(row.get("total_usage_res")) + safe_float(row.get("total_supply_res"))
+ACTUAL_COMMON_REVENUE_CY24 = safe_float(row.get("total_usage_common")) + safe_float(row.get("total_supply_common"))
+
+PROPOSED_USAGE = safe_float(row.get("proposed_usage_c_per_kwh", 20.0))
+PROPOSED_DAILY = safe_float(row.get("proposed_daily_c", 100.0)) / 100.0
 
 # --------------------------------------
 # SIDEBAR INPUTS
@@ -98,9 +131,8 @@ if input_mode == "Manual Input":
 elif competitor_offer:
     usage_key = f"{retailer}_usage_rate"
     supply_key = f"{retailer}_daily_charge"
-    usage_rate = competitor_offer.get(usage_key, PROPOSED_USAGE)
-    daily_supply = competitor_offer.get(supply_key, PROPOSED_DAILY) / 100
-
+    usage_rate = safe_float(competitor_offer.get(usage_key, PROPOSED_USAGE))
+    daily_supply = safe_float(competitor_offer.get(supply_key, PROPOSED_DAILY * 100)) / 100
     st.sidebar.metric("🔌 Usage Rate (c/kWh)", f"{usage_rate:.2f}")
     st.sidebar.metric("📆 Daily Supply ($/day)", f"${daily_supply:.4f}")
 else:
@@ -112,6 +144,8 @@ else:
 # CALCULATION FUNCTION
 # --------------------------------------
 def calculate_tariff_impact(usage_kwh, nmis, usage_rate_c_per_kwh, daily_supply_dollars):
+    usage_kwh = safe_float(usage_kwh)
+    nmis = safe_float(nmis)
     usage_rate_dollars = usage_rate_c_per_kwh / 100.0
     usage_revenue = usage_rate_dollars * usage_kwh
     supply_revenue = daily_supply_dollars * nmis * DAYS_IN_YEAR
@@ -121,12 +155,11 @@ def calculate_tariff_impact(usage_kwh, nmis, usage_rate_c_per_kwh, daily_supply_
 # --------------------------------------
 # CALCULATIONS
 # --------------------------------------
-unmetered_usage_kwh = TOTAL_USAGE_GATE - (RESI_USAGE_KWH + METERED_COMMON_USAGE_KWH)
-if unmetered_usage_kwh < 0:
-    unmetered_usage_kwh = 0
+unmetered_usage_kwh = max(0.0, safe_float(TOTAL_USAGE_GATE) - (safe_float(RESI_USAGE_KWH) + safe_float(METERED_COMMON_USAGE_KWH)))
 
 resi_usage_rev, resi_supply_rev, _ = calculate_tariff_impact(RESI_USAGE_KWH, NMIS_RES, usage_rate, daily_supply)
 common_usage_rev, common_supply_rev, _ = calculate_tariff_impact(METERED_COMMON_USAGE_KWH, NMIS_COMMON, usage_rate, daily_supply)
+
 total_res = (resi_usage_rev + resi_supply_rev) * 1.10
 total_common = (common_usage_rev + common_supply_rev) * 1.10
 
@@ -149,33 +182,33 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title(f"📊 {village_name} — Tariff Assessment")
+st.title(f"\U0001F4CA {village_name} — Tariff Assessment")
 
 res_col, common_col = st.columns(2)
 with res_col:
-    st.subheader("🏠 Residential Revenue")
-    st.metric("🔌 Usage Revenue", f"${resi_usage_rev:,.2f}")
-    st.metric("📆 Daily Supply Revenue", f"${resi_supply_rev:,.2f}")
-    st.metric("💰 Total Residential Revenue (incl. GST)", f"${total_res:,.2f}")
+    st.subheader("\U0001F3E0 Residential Revenue")
+    st.metric("\U0001F50C Usage Revenue", f"${resi_usage_rev:,.2f}")
+    st.metric("\U0001F4C6 Daily Supply Revenue", f"${resi_supply_rev:,.2f}")
+    st.metric("\U0001F4B0 Total Residential Revenue (incl. GST)", f"${total_res:,.2f}")
 
 with common_col:
-    st.subheader("🏢 Common Area Revenue")
-    st.metric("🔌 Usage Revenue", f"${common_usage_rev:,.2f}")
-    st.metric("📆 Daily Supply Revenue", f"${common_supply_rev:,.2f}")
-    st.metric("💰 Total Metered Common Revenue (incl. GST)", f"${total_common:,.2f}")
+    st.subheader("\U0001F3E2 Common Area Revenue")
+    st.metric("\U0001F50C Usage Revenue", f"${common_usage_rev:,.2f}")
+    st.metric("\U0001F4C6 Daily Supply Revenue", f"${common_supply_rev:,.2f}")
+    st.metric("\U0001F4B0 Total Metered Common Revenue (incl. GST)", f"${total_common:,.2f}")
 
 st.markdown("---")
 unbilled_col, allocation_col = st.columns(2)
 with unbilled_col:
-    st.subheader("🚨 Unmetered Common Area Usage")
+    st.subheader("⚠️ Unmetered Common Area Usage")
     st.metric("⚡ Unmetered Usage (kWh)", f"{unmetered_usage_kwh:,.0f} kWh")
-    st.metric("💰 Unbilled Usage Cost (Gap to Recover)", f"${unbilled_cost:,.2f}")
+    st.metric("\U0001F4B0 Unbilled Usage Cost (Gap to Recover)", f"${unbilled_cost:,.2f}")
 
 with allocation_col:
-    st.subheader("📊 Unbilled Usage Cost Allocation")
-    st.metric("🏢 Annual Cost per Residential NMI", f"${unbilled_cost_per_res_nmi_annual:,.2f}")
-    st.metric("📅 Daily Cost per Residential NMI", f"${unbilled_cost_per_res_nmi_daily:,.4f}")
+    st.subheader("\U0001F4CA Unbilled Usage Cost Allocation")
+    st.metric("\U0001F3E2 Annual Cost per Residential NMI", f"${unbilled_cost_per_res_nmi_annual:,.2f}")
+    st.metric("\U0001F4C5 Daily Cost per Residential NMI", f"${unbilled_cost_per_res_nmi_daily:,.4f}")
 
 st.markdown("---")
 st.subheader("⚠️ Unrecovered Gate Meter Cost")
-st.metric(label="💰 Cost Not Recovered via Billing", value=f"${unrecovered_cost:,.2f}")
+st.metric(label="\U0001F4B0 Cost Not Recovered via Billing", value=f"${unrecovered_cost:,.2f}")
