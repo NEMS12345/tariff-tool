@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+
+>>>>>>> c438aeaec3baf340febbf09fd9c7f63a3c463f17
 import streamlit as st
 from supabase import create_client, Client
 
@@ -108,13 +112,24 @@ if input_mode == "Competitor Offer" and competitor_offer:
 # PULL VALUES FROM SUPABASE
 # --------------------------------------
 TOTAL_USAGE_GATE = safe_float(row.get("total_usage_kwh"))
+<<<<<<< HEAD
 RESI_USAGE_DOLLARS = safe_float(row.get("child_billed_kwh"))
 COMMON_USAGE_DOLLARS = safe_float(row.get("total_usage_common"))
+=======
+RESI_USAGE_KWH = safe_float(row.get("child_billed_kwh"))
+METERED_COMMON_USAGE_KWH = safe_float(row.get("total_usage_common"))
+>>>>>>> c438aeaec3baf340febbf09fd9c7f63a3c463f17
 NMIS_RES = safe_float(row.get("nmis_res"))
 NMIS_COMMON = safe_float(row.get("nmis_common"))
 DAYS_IN_YEAR = 365
 TOTAL_SITE_COST = safe_float(row.get("total_cost"))
 
+<<<<<<< HEAD
+=======
+ACTUAL_RESI_REVENUE_CY24 = safe_float(row.get("total_usage_res")) + safe_float(row.get("total_supply_res"))
+ACTUAL_COMMON_REVENUE_CY24 = safe_float(row.get("total_usage_common")) + safe_float(row.get("total_supply_common"))
+
+>>>>>>> c438aeaec3baf340febbf09fd9c7f63a3c463f17
 PROPOSED_USAGE = safe_float(row.get("proposed_usage_c_per_kwh", 20.0))
 PROPOSED_DAILY = safe_float(row.get("proposed_daily_c", 100.0)) / 100.0
 
@@ -132,10 +147,15 @@ elif competitor_offer:
     st.sidebar.metric("🔌 Usage Rate (c/kWh)", f"{usage_rate:.2f}")
     st.sidebar.metric("📆 Daily Supply ($/day)", f"${daily_supply:.4f}")
 else:
+<<<<<<< HEAD
+=======
+    st.warning("No competitor offer found for this village. Defaulting to manual input.")
+>>>>>>> c438aeaec3baf340febbf09fd9c7f63a3c463f17
     usage_rate = PROPOSED_USAGE
     daily_supply = PROPOSED_DAILY
 
 # --------------------------------------
+<<<<<<< HEAD
 # CALCULATIONS
 # --------------------------------------
 resi_usage_rev = RESI_USAGE_DOLLARS
@@ -143,15 +163,44 @@ resi_supply_rev = daily_supply * NMIS_RES * DAYS_IN_YEAR
 
 common_usage_rev = COMMON_USAGE_DOLLARS
 common_supply_rev = daily_supply * NMIS_COMMON * DAYS_IN_YEAR
+=======
+# CALCULATION FUNCTION
+# --------------------------------------
+def calculate_tariff_impact(usage_kwh, nmis, usage_rate_c_per_kwh, daily_supply_dollars):
+    usage_kwh = safe_float(usage_kwh)
+    nmis = safe_float(nmis)
+    usage_rate_dollars = usage_rate_c_per_kwh / 100.0
+    usage_revenue = usage_rate_dollars * usage_kwh
+    supply_revenue = daily_supply_dollars * nmis * DAYS_IN_YEAR
+    projected_revenue = usage_revenue + supply_revenue
+    return usage_revenue, supply_revenue, projected_revenue
+
+# --------------------------------------
+# CALCULATIONS
+# --------------------------------------
+unmetered_usage_kwh = max(0.0, safe_float(TOTAL_USAGE_GATE) - (safe_float(RESI_USAGE_KWH) + safe_float(METERED_COMMON_USAGE_KWH)))
+
+resi_usage_rev, resi_supply_rev, _ = calculate_tariff_impact(RESI_USAGE_KWH, NMIS_RES, usage_rate, daily_supply)
+common_usage_rev, common_supply_rev, _ = calculate_tariff_impact(METERED_COMMON_USAGE_KWH, NMIS_COMMON, usage_rate, daily_supply)
+>>>>>>> c438aeaec3baf340febbf09fd9c7f63a3c463f17
 
 total_res = (resi_usage_rev + resi_supply_rev) * 1.10
 total_common = (common_usage_rev + common_supply_rev) * 1.10
 
+<<<<<<< HEAD
 unmetered_usage_kwh = max(0.0, safe_float(TOTAL_USAGE_GATE) - (safe_float(RESI_USAGE_DOLLARS) + safe_float(COMMON_USAGE_DOLLARS)))
 unbilled_cost = TOTAL_SITE_COST - (total_res + total_common)
 unbilled_cost_per_res_nmi_annual = unbilled_cost / NMIS_RES if NMIS_RES else 0
 unbilled_cost_per_res_nmi_daily = unbilled_cost_per_res_nmi_annual / DAYS_IN_YEAR
 unrecovered_cost = TOTAL_SITE_COST - (total_res + total_common)
+=======
+unbilled_cost = TOTAL_SITE_COST - (total_res + total_common)
+unbilled_cost_per_res_nmi_annual = unbilled_cost / NMIS_RES if NMIS_RES else 0
+unbilled_cost_per_res_nmi_daily = unbilled_cost_per_res_nmi_annual / DAYS_IN_YEAR
+
+combined_billed_revenue = total_res + total_common
+unrecovered_cost = TOTAL_SITE_COST - combined_billed_revenue
+>>>>>>> c438aeaec3baf340febbf09fd9c7f63a3c463f17
 
 # --------------------------------------
 # DISPLAY
