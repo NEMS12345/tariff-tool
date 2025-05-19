@@ -8,7 +8,14 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 
 # Load environment variables from .env file
-load_dotenv()
+env_path = r"C:\Users\rjdar\Downloads\tariff-tool\.env"
+if os.path.exists(env_path):
+    load_dotenv(dotenv_path=env_path)
+    print(f"Found .env file at: {env_path}")
+    print(f"SUPABASE_URL: {os.getenv('SUPABASE_URL')}")
+    print(f"SUPABASE_KEY: {os.getenv('SUPABASE_KEY')}")
+else:
+    print(f"Could not find .env file at: {env_path}")
 
 # ───────────────────────────────────────────────────────────────
 # CONFIGURATION
@@ -19,6 +26,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Debug information about .env file
+if os.path.exists(env_path):
+    st.sidebar.success(f"Found .env file at: {env_path}")
+else:
+    st.sidebar.error(f"Could not find .env file at: {env_path}")
 
 # ───────────────────────────────────────────────────────────────
 # GLOBAL CSS
@@ -63,11 +76,24 @@ st.markdown(
 # ───────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def supabase_client() -> Client:
+    # Try to get from environment variables
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY")
-    if not url or not key:
-        st.error("Supabase credentials not found in environment variables. Please check your .env file.")
-        st.stop()
+    
+    # Debug information
+    st.sidebar.markdown("### Environment Variables Debug")
+    st.sidebar.write(f"SUPABASE_URL found: {'Yes' if url else 'No'}")
+    st.sidebar.write(f"SUPABASE_KEY found: {'Yes' if key else 'No'}")
+    
+    # Use hardcoded values as fallback
+    if not url:
+        url = "https://nivriefipgzsqexdnhaa.supabase.co"
+        st.sidebar.warning("Using hardcoded URL as fallback")
+    
+    if not key:
+        key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5pdnJpZWZpcGd6c3FleGRuaGFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY4NTIyMDEsImV4cCI6MjA2MjQyODIwMX0.trAUIqGoZ2fOOu8C1CUlhnvNDFpRt7CIH4SxPegP1Ag"
+        st.sidebar.warning("Using hardcoded key as fallback")
+    
     return create_client(url, key)
 
 client = supabase_client()
