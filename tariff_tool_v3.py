@@ -7,15 +7,14 @@ import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
-# Load environment variables from .env file
-env_path = r"C:\Users\rjdar\Downloads\tariff-tool\.env"
-if os.path.exists(env_path):
-    load_dotenv(dotenv_path=env_path)
-    print(f"Found .env file at: {env_path}")
-    print(f"SUPABASE_URL: {os.getenv('SUPABASE_URL')}")
-    print(f"SUPABASE_KEY: {os.getenv('SUPABASE_KEY')}")
-else:
-    print(f"Could not find .env file at: {env_path}")
+# Try to load environment variables from .env file for local development
+try:
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    if os.path.exists(env_path):
+        load_dotenv(dotenv_path=env_path)
+        print(f"Found .env file at: {env_path}")
+except Exception as e:
+    print(f"Error loading .env file: {e}")
 
 # ───────────────────────────────────────────────────────────────
 # CONFIGURATION
@@ -27,11 +26,16 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Debug information about .env file
-if os.path.exists(env_path):
-    st.sidebar.success(f"Found .env file at: {env_path}")
-else:
-    st.sidebar.error(f"Could not find .env file at: {env_path}")
+# Debug information about environment
+try:
+    if os.path.exists(os.path.join(os.path.dirname(__file__), '.env')):
+        st.sidebar.success("Found .env file for local development")
+    elif 'supabase' in st.secrets:
+        st.sidebar.success("Found Streamlit secrets configuration")
+    else:
+        st.sidebar.warning("No configuration found. Using fallback values.")
+except Exception as e:
+    st.sidebar.error(f"Error checking configuration: {e}")
 
 # ───────────────────────────────────────────────────────────────
 # GLOBAL CSS
@@ -76,12 +80,22 @@ st.markdown(
 # ───────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def supabase_client() -> Client:
-    # Try to get from environment variables
+    # Try to get from Streamlit secrets first (for cloud deployment)
+    try:
+        if 'supabase' in st.secrets:
+            url = st.secrets.supabase.url
+            key = st.secrets.supabase.key
+            st.sidebar.success("Using Streamlit secrets for Supabase credentials")
+            return create_client(url, key)
+    except Exception as e:
+        st.sidebar.error(f"Error accessing Streamlit secrets: {e}")
+    
+    # Try to get from environment variables (for local development)
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY")
     
     # Debug information
-    st.sidebar.markdown("### Environment Variables Debug")
+    st.sidebar.markdown("### Credentials Debug")
     st.sidebar.write(f"SUPABASE_URL found: {'Yes' if url else 'No'}")
     st.sidebar.write(f"SUPABASE_KEY found: {'Yes' if key else 'No'}")
     
