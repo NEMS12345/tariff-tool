@@ -1,3 +1,5 @@
-﻿streamlit
-supabase
-
+streamlit>=1.43.0
+pandas>=2.0.0
+matplotlib>=3.5.0
+python-dotenv>=1.0.0
+supabase>=2.0.0
