@@ -24,13 +24,32 @@ A Streamlit application for analyzing and comparing energy tariffs.
    python -m streamlit run tariff_tool_v3.py
    ```
 
-## Environment Variables
+## Environment Variables and Secrets
 
-This application uses environment variables to store sensitive information like API credentials. The `.env` file is excluded from version control for security reasons.
+This application uses environment variables and Streamlit secrets to store sensitive information like API credentials.
 
-To set up your environment:
+### Local Development
+
+For local development, you can use a `.env` file:
 1. Copy `.env.example` to `.env`
 2. Replace the placeholder values with your actual Supabase credentials
+
+### Cloud Deployment
+
+For Streamlit Cloud deployment, you need to set up secrets in the Streamlit Cloud dashboard:
+
+1. Go to your app dashboard on Streamlit Cloud
+2. Navigate to the "Settings" tab
+3. Under "Secrets", add the following configuration:
+
+```toml
+[supabase]
+url = "your_supabase_url_here"
+key = "your_supabase_key_here"
+```
+
+4. Replace the placeholder values with your actual Supabase credentials
+5. Save the changes and redeploy your app
 
 ## Features
 
