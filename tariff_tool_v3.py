@@ -267,12 +267,25 @@ sim_opex            = (
 # ───────────────────────────────────────────────────────────────
 import os
 
-# Change the extension if your file isn’t PNG, e.g. "logo.jpg"
-logo_path = os.path.join(r"C:\Users\rjdar\Downloads\tariff-tool\logo.jpg")
+# Use a relative path for the logo file that works in both local and cloud environments
+try:
+    # Try to use the logo file in the current directory
+    logo_path = "logo.jpg"
+    
+    # Skip logo if running in cloud and file doesn't exist
+    if not os.path.exists(logo_path):
+        st.sidebar.warning("Logo file not found. Skipping logo display.")
+        has_logo = False
+    else:
+        has_logo = True
+except Exception as e:
+    st.sidebar.error(f"Error loading logo: {e}")
+    has_logo = False
 
 col_logo, col_title = st.columns([9, 9])   # 1/10 width for the logo, 9/10 for title
 with col_logo:
-    st.image(logo_path, width=300)          # tweak width if you need larger/smaller
+    if has_logo:
+        st.image(logo_path, width=300)          # tweak width if you need larger/smaller
 with col_title:
     if is_summary:
         st.title("All Villages Summary - Embedded Network Review 2024")
@@ -404,7 +417,7 @@ with tab_overview:
                     "Δ vs Village %":          f"{delta:+.1f}%",
                 })
 
-        # Move the village row to the bottom so it’s easy to compare
+        # Move the village row to the bottom so it's easy to compare
         village_row     = rows.pop(0)
         rows.append(village_row)
 
